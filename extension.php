@@ -77,6 +77,8 @@ final class FeedDigestExtension extends Minz_Extension {
 	 */
 	public function handleUserMaintenance(): void {
 		try {
+			Minz_Log::warning('Feed Digest: Maintenance hook triggered');
+
 			// Get configuration
 			$apiEndpoint = $this->getSystemConfigurationValue('api_endpoint', 'https://api.openai.com/v1');
 			$secretKey = $this->getSystemConfigurationValue('secret_key', '');
@@ -86,6 +88,7 @@ final class FeedDigestExtension extends Minz_Extension {
 
 			// Skip if API not configured
 			if (empty($secretKey)) {
+				Minz_Log::warning('Feed Digest: Skipping - no API key configured');
 				return;
 			}
 
@@ -94,12 +97,18 @@ final class FeedDigestExtension extends Minz_Extension {
 			$feeds = $feedDAO->listFeeds();
 
 			// Process each feed with summarization enabled
+			$enabledCount = 0;
 			foreach ($feeds as $feed) {
 				if (!$feed->attributeBoolean('feed_digest_enabled')) {
 					continue;
 				}
+				$enabledCount++;
 
 				$this->processFeed($feed, $apiEndpoint, $secretKey, $model, $destLanguage, $maxContentLength);
+			}
+
+			if ($enabledCount === 0) {
+				Minz_Log::warning('Feed Digest: No feeds have summarization enabled');
 			}
 		} catch (Exception $e) {
 			Minz_Log::error('Feed Digest error: ' . $e->getMessage());
@@ -165,7 +174,11 @@ final class FeedDigestExtension extends Minz_Extension {
 					      . '<strong>Feed Digest:</strong> This article was not summarized. Reason: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8')
 					      . '</div>';
 
-					$entry->_content($note . $originalContent);
+					$newContent = $note . $originalContent;
+					$entry->_content($newContent);
+					$entry->_hash(md5($newContent)); // Update hash since content changed
+					$entry->_lastSeen(time()); // Update lastSeen timestamp
+
 					$entryDAO->updateEntry($entry->toArray());
 				}
 			}
@@ -175,7 +188,7 @@ final class FeedDigestExtension extends Minz_Extension {
 
 			// Check if we have enough articles to process at least one batch
 			if ($totalWorthy < $batchSize) {
-				Minz_Log::notice("Feed Digest: Skipping {$feed->name()} - only {$totalWorthy} articles worth summarizing (batch size: {$batchSize})");
+				Minz_Log::warning("Feed Digest: Skipping {$feed->name()} - only {$totalWorthy} articles worth summarizing (batch size: {$batchSize})");
 				return; // Don't mark as read, wait for more articles
 			}
 
