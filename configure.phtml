@@ -1,0 +1,162 @@
+<?php
+if (!isset($this)) {
+	http_response_code(403);
+	die('Forbidden');
+}
+
+$config = $this->getSystemConfiguration();
+$apiEndpoint = $config['api_endpoint'] ?? 'https://api.openai.com/v1';
+$secretKey = $config['secret_key'] ?? '';
+$model = $config['model'] ?? 'gpt-5-nano';
+$destLanguage = $config['dest_language'] ?? 'English';
+$maxContentLength = $config['max_content_length'] ?? 4000;
+?>
+
+<div class="post">
+	<h2><?= _t('ext.feed_digest.config_title', 'Feed Digest Configuration') ?></h2>
+
+	<?php if (isset($this->test_result) && $this->test_result !== null): ?>
+		<div class="alert alert-<?= $this->test_success ? 'success' : 'error' ?>">
+			<span class="alert-head"><?= $this->test_success ? '✓ ' . _t('gen.short.ok') : '✗ ' . _t('gen.short.damn') ?></span>
+			<?= htmlspecialchars($this->test_result, ENT_NOQUOTES, 'UTF-8') ?>
+		</div>
+	<?php endif; ?>
+
+	<div class="alert alert-warn">
+		<p><strong><?= _t('ext.feed_digest.warning_title', 'Important Warnings:') ?></strong></p>
+		<ul>
+			<li><?= _t('ext.feed_digest.warning_cost', 'API calls cost money. Monitor your usage and costs regularly.') ?></li>
+			<li><?= _t('ext.feed_digest.warning_retry', 'Failed API calls will automatically retry on every feed update until successful.') ?></li>
+			<li><?= _t('ext.feed_digest.warning_timeout', 'You may need to increase PHP max_execution_time for large batches (recommended: 300+ seconds).') ?></li>
+			<li><?= _t('ext.feed_digest.warning_rate_limit', 'High article counts may hit API rate limits.') ?></li>
+			<li><strong>Batch threshold:</strong> Set per-feed minimum article count in each feed's settings to control when summarization triggers.</li>
+		</ul>
+	</div>
+
+	<?php
+	// Preserve ajax parameter if present to keep slider open
+	$formAction = _url('extension', 'configure', 'e', $this->getName());
+	if (Minz_Request::paramBoolean('ajax')) {
+		$formAction .= '&ajax=1';
+	}
+	?>
+	<form action="<?= $formAction ?>" method="post">
+		<input type="hidden" name="_csrf" value="<?= FreshRSS_Auth::csrfToken() ?>" />
+
+		<div class="form-group">
+			<label class="group-name" for="api_endpoint">
+				<?= _t('ext.feed_digest.api_endpoint', 'API Endpoint') ?>
+			</label>
+			<div class="group-controls">
+				<input type="url" id="api_endpoint" name="api_endpoint"
+				       value="<?= htmlspecialchars($apiEndpoint, ENT_QUOTES, 'UTF-8') ?>"
+				       placeholder="https://api.openai.com/v1"
+				       required="required" />
+				<p class="help-block">
+					<?= _t('ext.feed_digest.api_endpoint_help',
+					       'OpenAI-compatible API endpoint. Examples: https://api.openai.com/v1, https://api.anthropic.com, or local model endpoints.') ?>
+				</p>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label class="group-name" for="secret_key">
+				<?= _t('ext.feed_digest.secret_key', 'API Secret Key') ?> *
+			</label>
+			<div class="group-controls">
+				<input type="password" id="secret_key" name="secret_key"
+				       value="<?= htmlspecialchars($secretKey, ENT_QUOTES, 'UTF-8') ?>"
+				       placeholder="sk-..."
+				       required="required" />
+				<p class="help-block">
+					<?= _t('ext.feed_digest.secret_key_help',
+					       'Your API secret key for authentication. Keep this secure!') ?>
+				</p>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label class="group-name" for="model">
+				<?= _t('ext.feed_digest.model', 'Model Name') ?>
+			</label>
+			<div class="group-controls">
+				<input type="text" id="model" name="model"
+				       value="<?= htmlspecialchars($model, ENT_QUOTES, 'UTF-8') ?>"
+				       placeholder="gpt-5-nano"
+				       required="required" />
+				<p class="help-block">
+					<?= _t('ext.feed_digest.model_help',
+					       'LLM model name. Examples: gpt-5-nano, gpt-4o-mini, claude-3-5-sonnet-20241022, etc.') ?>
+				</p>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label class="group-name" for="dest_language">
+				<?= _t('ext.feed_digest.dest_language', 'Destination Language') ?>
+			</label>
+			<div class="group-controls">
+				<input type="text" id="dest_language" name="dest_language"
+				       value="<?= htmlspecialchars($destLanguage, ENT_QUOTES, 'UTF-8') ?>"
+				       placeholder="English"
+				       required="required" />
+				<p class="help-block">
+					<?= _t('ext.feed_digest.dest_language_help',
+					       'Target language for summaries and title translations. Examples: English, Spanish, Simplified Chinese, French, Japanese, etc.') ?>
+				</p>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label class="group-name" for="max_content_length">
+				<?= _t('ext.feed_digest.max_content_length', 'Max Content Length per Article') ?>
+			</label>
+			<div class="group-controls">
+				<input type="number" id="max_content_length" name="max_content_length"
+				       value="<?= htmlspecialchars((string)$maxContentLength, ENT_QUOTES, 'UTF-8') ?>"
+				       min="500" max="16000" step="100"
+				       required="required" />
+				<p class="help-block">
+					<?= _t('ext.feed_digest.max_content_length_help',
+					       'Maximum characters per article content before truncation (500-16000). Helps avoid exceeding LLM context limits. Default 4000 is safe for most models.') ?>
+				</p>
+			</div>
+		</div>
+
+		<div class="form-group form-actions">
+			<button type="submit" class="btn btn-important">
+				<?= _t('gen.action.submit') ?>
+			</button>
+			<button type="submit" name="test_api" value="1" class="btn btn-attention">
+				<?= _t('ext.feed_digest.test_api', 'Test API Connection') ?>
+			</button>
+			<button type="reset" class="btn">
+				<?= _t('gen.action.cancel') ?>
+			</button>
+		</div>
+	</form>
+
+	<hr />
+
+	<h3><?= _t('ext.feed_digest.per_feed_title', 'Per-Feed Configuration') ?></h3>
+	<p>
+		<?= _t('ext.feed_digest.per_feed_help',
+		       'To enable LLM summarization for a specific feed, go to the feed\'s settings page and check the "Summarize articles with LLM" option.') ?>
+	</p>
+	<p>
+		<?= _t('ext.feed_digest.per_feed_location',
+		       'Location: Settings → Feeds → [Select a feed] → Advanced Settings → Summarize articles with LLM') ?>
+	</p>
+
+	<hr />
+
+	<h3><?= _t('ext.feed_digest.how_it_works_title', 'How It Works') ?></h3>
+	<ol>
+		<li><?= _t('ext.feed_digest.how_step1', 'During scheduled feed updates, the extension checks each feed with summarization enabled.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step2', 'Unread articles are collected (up to the max articles limit) and sent to the LLM API in one batch.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step3', 'The LLM summarizes each article and translates titles to your destination language.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step4', 'A combined summary article is created and added to the feed.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step5', 'Original articles are marked as read.') ?></li>
+		<li><?= _t('ext.feed_digest.how_step6', 'If any errors occur, articles remain unread and will be retried on the next update.') ?></li>
+	</ol>
+</div>

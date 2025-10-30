@@ -1,0 +1,58 @@
+<?php
+/**
+ * Per-feed setting for Feed Digest
+ * We capture the core view output and inject our fields before the form closes
+ */
+if (!isset($this->feed) || $this->feed === null) {
+	return;
+}
+
+// Capture the core view output
+ob_start();
+$core_view = APP_PATH . '/views/helpers/feed/update.phtml';
+if (file_exists($core_view)) {
+	include $core_view;
+}
+$core_html = ob_get_clean();
+
+// Build our extension fields
+$batchSize = $this->feed->attributeInt('feed_digest_batch_size') ?: 10;
+$enabled = $this->feed->attributeBoolean('feed_digest_enabled');
+
+$our_fields = '
+<hr />
+<fieldset style="margin-top: 2em;">
+	<legend>' . _t('ext.feed_digest.feed_setting_title', 'Feed Digest') . '</legend>
+
+	<div class="form-group">
+		<label class="group-name" for="feed_digest_enabled">' . _t('ext.feed_digest.feed_setting_label', 'Summarize articles with LLM') . '</label>
+		<div class="group-controls">
+			<select name="feed_digest_enabled" id="feed_digest_enabled" class="w50">
+				<option value=""' . ($enabled === null ? ' selected="selected"' : '') . '>' . _t('gen.short.no') . '</option>
+				<option value="1"' . ($enabled === true ? ' selected="selected"' : '') . '>' . _t('gen.short.yes') . '</option>
+			</select>
+			<p class="help">' . _i('help') . ' ' . _t('ext.feed_digest.feed_setting_help', 'Automatically summarize new articles from this feed and mark originals as read.') . '</p>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="group-name" for="feed_digest_batch_size">' . _t('ext.feed_digest.batch_size_label', 'Articles per summary batch') . '</label>
+		<div class="group-controls">
+			<input type="number" name="feed_digest_batch_size" id="feed_digest_batch_size"
+			       value="' . $batchSize . '"
+			       min="1" max="50"
+			       class="w50" />
+			<p class="help">' . _i('help') . ' ' . _t('ext.feed_digest.batch_size_help', 'Number of articles to include in each summary. Default: 10') . '</p>
+		</div>
+	</div>
+
+</fieldset>
+';
+
+// Inject our fields before the form-actions div (which comes before </form>)
+$pattern = '/(<div class="form-group form-actions">)/';
+$replacement = $our_fields . "\n" . '$1';
+$modified_html = preg_replace($pattern, $replacement, $core_html, 1);
+
+echo $modified_html;
+?>

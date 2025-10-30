@@ -1,0 +1,8 @@
+{
+	"name": "Feed Digest",
+	"author": "Chang Feng",
+	"description": "Automatically summarizes newly retrieved RSS articles using LLM APIs (OpenAI-compatible)",
+	"version": "1.0.0",
+	"entrypoint": "FeedDigest",
+	"type": "system"
+}
