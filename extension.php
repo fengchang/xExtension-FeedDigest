@@ -312,6 +312,8 @@ final class FeedDigestExtension extends Minz_Extension {
 			],
 		];
 
+		$payloadJson = json_encode($payload);
+
 		// Make API call
 		$ch = curl_init($url);
 		if ($ch === false) {
@@ -325,8 +327,9 @@ final class FeedDigestExtension extends Minz_Extension {
 				'Content-Type: application/json',
 				'Authorization: Bearer ' . $secretKey,
 			],
-			CURLOPT_POSTFIELDS => json_encode($payload),
-			CURLOPT_TIMEOUT => 120,
+			CURLOPT_POSTFIELDS => $payloadJson,
+			CURLOPT_TIMEOUT => 180, // 3 minutes timeout for large batches
+			CURLOPT_CONNECTTIMEOUT => 30,
 		]);
 
 		$response = curl_exec($ch);
@@ -404,14 +407,29 @@ PROMPT;
 			$content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 			$content = trim(preg_replace('/\s+/', ' ', $content));
 
+			// Fix UTF-8 encoding issues that prevent JSON encoding
+			// Convert to UTF-8 and remove any invalid sequences
+			$content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+
+			// Also clean the title
+			$title = $entry->title();
+			$title = mb_convert_encoding($title, 'UTF-8', 'UTF-8');
+
 			$articlesJson[] = [
 				'index' => $index + 1,
-				'title' => $entry->title(),
+				'title' => $title,
 				'content' => $content,
 			];
 		}
 
-		return "Articles to summarize:\n\n" . json_encode($articlesJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+		$jsonEncoded = json_encode($articlesJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+		if ($jsonEncoded === false) {
+			$jsonError = json_last_error_msg();
+			throw new Exception("Failed to encode articles as JSON: " . $jsonError);
+		}
+
+		return "Articles to summarize:\n\n" . $jsonEncoded;
 	}
 
 	/**
