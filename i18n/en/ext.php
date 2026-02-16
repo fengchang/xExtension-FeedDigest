@@ -43,7 +43,7 @@ return [
 		'feed_setting_label' => 'Summarize articles with LLM',
 		'feed_setting_help' => 'Automatically summarize new articles from this feed and mark originals as read.',
 		'batch_size_label' => 'Articles per summary batch',
-		'batch_size_help' => 'Number of articles to include in each summary. Default: 10',
+		'batch_size_help' => 'When set to 1: Each article gets a translated copy with summary prepended, original is marked as read. When > 1: Creates a combined summary article and marks originals as read.',
 
 		// How it works
 		'how_it_works_title' => 'How It Works',
